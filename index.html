@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sky Archer – Bird Hunt</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Nunito:wght@400;700&display=swap');
+
+  :root {
+    --sky1: #87ceeb;
+    --sky2: #c9e8f5;
+    --sun: #ffe066;
+    --grass: #4caf50;
+    --ui-bg: rgba(0,0,0,0.55);
+    --gold: #f5c518;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  #gameContainer {
+    position: relative;
+    width: 820px;
+    max-width: 100vw;
+    height: 520px;
+    overflow: hidden;
+    border-radius: 18px;
+    box-shadow: 0 0 60px rgba(0,150,255,0.4), 0 0 120px rgba(0,50,120,0.3);
+    cursor: crosshair;
+  }
+
+  #sky {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, #1a6fb5 0%, #87ceeb 55%, #c9e8f5 80%, #a8d8a0 100%);
+  }
+
+  /* Animated clouds */
+  .cloud {
+    position: absolute;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50px;
+    filter: blur(6px);
+    animation: floatCloud linear infinite;
+  }
+  .cloud::before, .cloud::after {
+    content: '';
+    position: absolute;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50%;
+  }
+  .cloud::before { width: 60%; height: 150%; top: -40%; left: 20%; }
+  .cloud::after  { width: 40%; height: 130%; top: -30%; left: 55%; }
+
+  @keyframes floatCloud {
+    from { transform: translateX(-200px); }
+    to   { transform: translateX(920px); }
+  }
+
+  /* Sun */
+  #sun {
+    position: absolute;
+    width: 70px; height: 70px;
+    top: 18px; right: 60px;
+    background: radial-gradient(circle, #fff7a0, #ffe066 50%, #ffae00);
+    border-radius: 50%;
+    box-shadow: 0 0 40px 15px rgba(255,220,0,0.4);
+    animation: pulse 3s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 40px 15px rgba(255,220,0,0.4)} 50%{box-shadow:0 0 60px 25px rgba(255,220,0,0.6)} }
+
+  /* Ground */
+  #ground {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 70px;
+    background: linear-gradient(180deg, #5dbe5d, #388e3c);
+    border-top: 3px solid #81c784;
+  }
+
+  /* Archer */
+  #archer {
+    position: absolute;
+    bottom: 58px; left: 50px;
+    width: 52px; height: 80px;
+    z-index: 10;
+  }
+
+  /* Birds layer */
+  #birdsLayer { position: absolute; inset: 0; z-index: 5; }
+
+  /* Arrows layer */
+  #arrowsLayer { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+
+  /* Explosion particles layer */
+  #fxLayer { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
+
+  /* Aiming line */
+  #aimLine {
+    position: absolute; inset: 0; z-index: 6; pointer-events: none;
+  }
+
+  /* HUD */
+  #hud {
+    position: absolute;
+    top: 14px; left: 14px;
+    display: flex; gap: 14px;
+    z-index: 20;
+  }
+  .hud-box {
+    background: var(--ui-bg);
+    border: 1.5px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 6px 14px;
+    color: #fff;
+    font-size: 15px;
+    backdrop-filter: blur(4px);
+  }
+  .hud-box span { color: var(--gold); font-weight: 700; font-size: 18px; }
+
+  /* Arrows remaining */
+  #arrowBar {
+    position: absolute;
+    bottom: 78px; left: 14px;
+    display: flex; gap: 5px;
+    z-index: 20;
+  }
+  .arrow-icon {
+    width: 18px; height: 6px;
+    background: linear-gradient(90deg, #8B4513, #D2691E);
+    border-radius: 3px;
+    position: relative;
+    transition: opacity 0.2s;
+  }
+  .arrow-icon::after {
+    content:'';
+    position: absolute;
+    right: -5px; top: -4px;
+    border-left: 8px solid #D2691E;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+  }
+  .arrow-icon.used { opacity: 0.2; }
+
+  /* Overlay screens */
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,30,0.82);
+    z-index: 30;
+    backdrop-filter: blur(3px);
+  }
+  .overlay h1 {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 36px;
+    color: var(--gold);
+    text-shadow: 0 0 20px rgba(255,200,0,0.8);
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+  }
+  .overlay p { color: #cde; font-size: 17px; margin-bottom: 6px; text-align:center; padding: 0 20px; }
+  .overlay .big { font-size: 52px; color: var(--gold); font-family:'Cinzel Decorative',cursive; }
+
+  .btn {
+    margin-top: 22px;
+    padding: 13px 38px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #f5a623, #e8450a);
+    color: #fff;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(232,69,10,0.6);
+    transition: transform 0.15s, box-shadow 0.15s;
+    letter-spacing: 1px;
+  }
+  .btn:hover { transform: scale(1.07); box-shadow: 0 6px 28px rgba(232,69,10,0.8); }
+
+  /* Score popup */
+  .score-pop {
+    position: absolute;
+    font-weight: 700;
+    font-size: 22px;
+    color: #ffec42;
+    text-shadow: 0 2px 8px #000;
+    pointer-events: none;
+    z-index: 25;
+    animation: popUp 0.9s ease forwards;
+  }
+  @keyframes popUp {
+    0%   { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-70px) scale(1.4); opacity: 0; }
+  }
+
+  /* Miss text */
+  .miss-pop {
+    position: absolute;
+    font-weight: 700;
+    font-size: 18px;
+    color: #ff6b6b;
+    text-shadow: 0 2px 8px #000;
+    pointer-events: none;
+    z-index: 25;
+    animation: popUp 0.7s ease forwards;
+  }
+
+  /* Charge meter */
+  #chargeMeter {
+    position: absolute;
+    bottom: 78px; right: 14px;
+    width: 120px; height: 16px;
+    background: rgba(0,0,0,0.4);
+    border: 1.5px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    overflow: hidden;
+    z-index: 20;
+  }
+  #chargeFill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #42e26b, #f5c518, #e84040);
+    transition: width 0.05s;
+    border-radius: 8px;
+  }
+  #chargeLabel {
+    position: absolute;
+    bottom: 96px; right: 14px;
+    color: #fff; font-size: 12px;
+    z-index: 20;
+    opacity: 0.8;
+  }
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <div id="sky"></div>
+  <div id="sun"></div>
+  <div id="ground"></div>
+  <canvas id="aimLine" width="820" height="520"></canvas>
+  <div id="birdsLayer"></div>
+  <div id="arrowsLayer"></div>
+  <div id="fxLayer"></div>
+
+  <!-- Archer SVG -->
+  <svg id="archer" viewBox="0 0 52 80" xmlns="http://www.w3.org/2000/svg">
+    <!-- Body -->
+    <ellipse cx="26" cy="58" rx="12" ry="18" fill="#5d4037"/>
+    <!-- Head -->
+    <circle cx="26" cy="32" r="11" fill="#ffb74d"/>
+    <!-- Hair -->
+    <path d="M16 28 Q26 18 36 28" fill="#4e342e"/>
+    <!-- Eye -->
+    <circle cx="30" cy="31" r="2" fill="#333"/>
+    <!-- Arm holding bow -->
+    <line x1="26" y1="48" x2="10" y2="38" stroke="#ffb74d" stroke-width="5" stroke-linecap="round"/>
+    <!-- Bow -->
+    <path d="M8 26 Q2 38 8 50" stroke="#795548" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <line x1="8" y1="26" x2="8" y2="50" stroke="#a1887f" stroke-width="1.5"/>
+    <!-- Arrow on bow -->
+    <line x1="8" y1="38" x2="26" y2="38" stroke="#8B4513" stroke-width="2"/>
+    <!-- Legs -->
+    <line x1="20" y1="74" x2="16" y2="80" stroke="#4e342e" stroke-width="5" stroke-linecap="round"/>
+    <line x1="32" y1="74" x2="36" y2="80" stroke="#4e342e" stroke-width="5" stroke-linecap="round"/>
+  </svg>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-box">🎯 Score: <span id="scoreDisplay">0</span></div>
+    <div class="hud-box">⏱ Level: <span id="levelDisplay">1</span></div>
+    <div class="hud-box">🐦 Left: <span id="birdsLeft">10</span></div>
+  </div>
+
+  <div id="chargeLabel">POWER</div>
+  <div id="chargeMeter"><div id="chargeFill"></div></div>
+  <div id="arrowBar"></div>
+
+  <!-- Start Screen -->
+  <div class="overlay" id="startScreen">
+    <h1>🏹 Sky Archer</h1>
+    <p>Hunt birds flying across the sky!</p>
+    <p><b style="color:#ffe066">Hold</b> mouse button to charge power, <b style="color:#ffe066">release</b> to fire!</p>
+    <p>You have <b style="color:#ffe066">10 arrows</b> per round. Score as high as you can!</p>
+    <button class="btn" onclick="startGame()">🏹 START HUNT</button>
+  </div>
+
+  <!-- Game Over -->
+  <div class="overlay" id="gameOverScreen" style="display:none">
+    <h1>Round Over!</h1>
+    <div class="big" id="finalScore">0</div>
+    <p id="resultMsg"></p>
+    <button class="btn" onclick="startGame()">🔄 PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+// ─── Audio Engine ───────────────────────────────────────────────
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTwang() {
+  const osc = AC.createOscillator();
+  const gain = AC.createGain();
+  osc.connect(gain); gain.connect(AC.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(600, AC.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(150, AC.currentTime + 0.15);
+  gain.gain.setValueAtTime(0.4, AC.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.2);
+  osc.start(); osc.stop(AC.currentTime + 0.2);
+}
+
+function playHit() {
+  // feathery pop
+  const buf = AC.createBuffer(1, AC.sampleRate * 0.15, AC.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random()*2-1) * Math.exp(-i/(AC.sampleRate*0.04));
+  const src = AC.createBufferSource();
+  const gain = AC.createGain();
+  const filter = AC.createBiquadFilter();
+  filter.type = 'bandpass'; filter.frequency.value = 800;
+  src.buffer = buf;
+  src.connect(filter); filter.connect(gain); gain.connect(AC.destination);
+  gain.gain.setValueAtTime(0.6, AC.currentTime);
+  src.start();
+
+  // pitch squawk
+  const osc = AC.createOscillator();
+  const g2 = AC.createGain();
+  osc.connect(g2); g2.connect(AC.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(900, AC.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(300, AC.currentTime + 0.18);
+  g2.gain.setValueAtTime(0.25, AC.currentTime);
+  g2.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.2);
+  osc.start(); osc.stop(AC.currentTime + 0.2);
+}
+
+function playMiss() {
+  const osc = AC.createOscillator();
+  const gain = AC.createGain();
+  osc.connect(gain); gain.connect(AC.destination);
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(300, AC.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(100, AC.currentTime + 0.3);
+  gain.gain.setValueAtTime(0.2, AC.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.35);
+  osc.start(); osc.stop(AC.currentTime + 0.35);
+}
+
+function playCharge(pct) {
+  const osc = AC.createOscillator();
+  const gain = AC.createGain();
+  osc.connect(gain); gain.connect(AC.destination);
+  osc.type = 'sine';
+  osc.frequency.value = 200 + pct * 4;
+  gain.gain.setValueAtTime(0.08, AC.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.06);
+  osc.start(); osc.stop(AC.currentTime + 0.07);
+}
+
+// ─── Game State ──────────────────────────────────────────────────
+let score = 0, level = 1, arrowsLeft = 10, birdsToSpawn = 10;
+let birds = [], arrows = [], particles = [];
+let mouseX = 400, mouseY = 260;
+let charging = false, chargeStart = 0, chargeLevel = 0;
+let animId;
+let gameRunning = false;
+let cloudObjs = [];
+
+const container = document.getElementById('gameContainer');
+const birdsLayer = document.getElementById('birdsLayer');
+const arrowsLayer = document.getElementById('arrowsLayer');
+const fxLayer = document.getElementById('fxLayer');
+const aimCanvas = document.getElementById('aimLine');
+const aimCtx = aimCanvas.getContext('2d');
+
+// Archer base point
+const ARCHER_X = 76, ARCHER_Y = 440;
+
+// ─── Bird Types ──────────────────────────────────────────────────
+const BIRD_TYPES = [
+  { color:'#7ec8e3', accent:'#fff', size:38, speed:1.8, pts:10, type:'round' },
+  { color:'#5b9e9e', accent:'#d0eaf0', size:44, speed:2.8, pts:20, type:'flat' },
+  { color:'#222', accent:'#555', size:30, speed:4.5, pts:30, type:'flock' },
+  { color:'#5ec4a8', accent:'#ff8fa3', size:36, speed:2.2, pts:15, type:'love' },
+];
+
+// ─── Bird SVG generators ─────────────────────────────────────────
+function makeBirdSVG(bt) {
+  if (bt.type === 'round') return `
+    <svg viewBox="0 0 80 60" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="40" cy="38" rx="24" ry="18" fill="${bt.color}"/>
+      <ellipse cx="36" cy="34" rx="14" ry="10" fill="rgba(255,255,255,0.3)"/>
+      <path d="M20 24 Q26 8 40 18 Q54 8 60 24 Q50 14 40 22 Q30 14 20 24Z" fill="${bt.color}" stroke="#aaa" stroke-width="0.8"/>
+      <path d="M24 22 Q30 12 40 18" fill="rgba(255,255,255,0.5)"/>
+      <polygon points="28,36 22,40 28,40" fill="#ffe066"/>
+      <ellipse cx="32" cy="33" rx="2" ry="2" fill="#333"/>
+      <line x1="36" y1="55" x2="30" y2="60" stroke="#666" stroke-width="1.5"/>
+      <line x1="44" y1="55" x2="50" y2="60" stroke="#666" stroke-width="1.5"/>
+    </svg>`;
+  if (bt.type === 'flat') return `
+    <svg viewBox="0 0 100 65" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 42 Q20 55 10 45 Q30 40 50 42Z" fill="${bt.color}"/>
+      <path d="M50 42 Q80 55 90 45 Q70 40 50 42Z" fill="${bt.color}"/>
+      <path d="M50 50 Q25 58 20 52" fill="none" stroke="${bt.color}" stroke-width="3"/>
+      <ellipse cx="50" cy="38" rx="16" ry="12" fill="${bt.color}"/>
+      <ellipse cx="55" cy="36" rx="5" ry="5" fill="${bt.color}"/>
+      <path d="M30 28 Q40 10 50 22 Q60 10 70 28 Q60 18 50 26 Q40 18 30 28Z" fill="${bt.accent}" stroke="${bt.color}" stroke-width="0.5"/>
+      <ellipse cx="58" cy="35" rx="2" ry="2" fill="#fff"/>
+      <ellipse cx="58.5" cy="35" rx="1" ry="1" fill="#222"/>
+      <path d="M63 37 L70 36 L63 38Z" fill="#ccc"/>
+    </svg>`;
+  if (bt.type === 'flock') return `
+    <svg viewBox="0 0 50 30" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 15 Q10 5 18 15" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M32 15 Q40 5 48 15" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+      <ellipse cx="25" cy="16" rx="7" ry="5" fill="#1a1a1a"/>
+      <circle cx="28" cy="14" r="1.5" fill="#fff" opacity="0.7"/>
+    </svg>`;
+  if (bt.type === 'love') return `
+    <svg viewBox="0 0 90 65" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="38" cy="40" rx="22" ry="16" fill="${bt.color}"/>
+      <ellipse cx="33" cy="36" rx="12" ry="8" fill="rgba(255,255,255,0.25)"/>
+      <path d="M18 30 Q24 16 38 26 Q52 16 56 30 Q46 20 38 28 Q30 20 18 30Z" fill="${bt.color}" stroke="#9B7D6F" stroke-width="0.7"/>
+      <polygon points="26,38 20,42 26,42" fill="#ff8fa3"/>
+      <ellipse cx="31" cy="37" rx="2" ry="2" fill="#5a3a2a"/>
+      <path d="M14 36 Q8 28 4 32 Q2 38 10 40Z" fill="${bt.color}"/>
+      <path d="M12 38 Q6 30 2 34 Q1 40 9 42Z" fill="${bt.color}"/>
+      <path d="M56 30 Q62 26 65 30 Q64 35 58 36Z" fill="#ff8fa3" stroke="#e07a90" stroke-width="0.5"/>
+      <path d="M70 20 Q73 16 76 18 Q76 22 72 23Z" fill="#ff6b9d" opacity="0.9"/>
+    </svg>`;
+}
+
+// ─── Cloud Init ──────────────────────────────────────────────────
+function initClouds() {
+  document.querySelectorAll('.cloud').forEach(e => e.remove());
+  cloudObjs = [];
+  for (let i = 0; i < 5; i++) {
+    const c = document.createElement('div');
+    c.className = 'cloud';
+    const w = 80 + Math.random()*120;
+    const h = 25 + Math.random()*20;
+    c.style.cssText = `width:${w}px;height:${h}px;top:${30+Math.random()*120}px;left:-200px;
+      animation-duration:${18+Math.random()*20}s;animation-delay:-${Math.random()*20}s;opacity:${0.6+Math.random()*0.3}`;
+    document.getElementById('sky').appendChild(c);
+  }
+}
+
+// ─── Spawn Bird ───────────────────────────────────────────────────
+let spawnTimer = 0;
+function spawnBird() {
+  if (birdsToSpawn <= 0) return;
+  birdsToSpawn--;
+  document.getElementById('birdsLeft').textContent = birdsToSpawn + birds.filter(b=>b.alive).length;
+
+  const bt = BIRD_TYPES[Math.floor(Math.random()*BIRD_TYPES.length)];
+  const fromRight = Math.random() > 0.5;
+  const y = 40 + Math.random() * 220;
+  const speedX = (bt.speed + (level-1)*0.4) * (fromRight ? -1 : 1);
+  const wobbleAmp = 10 + Math.random()*20;
+  const wobbleFreq = 0.015 + Math.random()*0.02;
+
+  const el = document.createElement('div');
+  el.style.cssText = `position:absolute;width:${bt.size*1.8}px;height:${bt.size*1.3}px;
+    transform-origin:center;transition:none;pointer-events:none;`;
+  el.innerHTML = makeBirdSVG(bt);
+  if (fromRight) el.style.transform = 'scaleX(-1)';
+  birdsLayer.appendChild(el);
+
+  birds.push({
+    el, x: fromRight ? 860 : -60, y, speedX,
+    wobbleAmp, wobbleFreq, wobbleOffset: Math.random()*Math.PI*2,
+    bt, alive: true, hitAnim: 0, t: 0,
+    fromRight
+  });
+}
+
+// ─── Arrow Bar ───────────────────────────────────────────────────
+function updateArrowBar() {
+  const bar = document.getElementById('arrowBar');
+  bar.innerHTML = '';
+  for (let i = 0; i < 10; i++) {
+    const d = document.createElement('div');
+    d.className = 'arrow-icon' + (i >= arrowsLeft ? ' used' : '');
+    bar.appendChild(d);
+  }
+}
+
+// ─── Fire Arrow ──────────────────────────────────────────────────
+function fireArrow() {
+  if (!gameRunning || arrowsLeft <= 0) return;
+  if (AC.state === 'suspended') AC.resume();
+  arrowsLeft--;
+  updateArrowBar();
+  playTwang();
+
+  const power = 0.4 + chargeLevel * 0.6;
+  const dx = mouseX - ARCHER_X;
+  const dy = mouseY - ARCHER_Y;
+  const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+  const spd = 10 + power * 14;
+
+  const arrow = {
+    x: ARCHER_X, y: ARCHER_Y,
+    vx: (dx/dist)*spd, vy: (dy/dist)*spd,
+    gravity: 0.18,
+    el: null, alive: true
+  };
+  const el = document.createElement('div');
+  el.style.cssText = `position:absolute;width:36px;height:6px;background:linear-gradient(90deg,#8B4513,#D2691E);
+    border-radius:2px;transform-origin:left center;left:${arrow.x}px;top:${arrow.y}px;`;
+  el.innerHTML = `<div style="position:absolute;right:-8px;top:-4px;
+    border-left:12px solid #D2691E;border-top:7px solid transparent;border-bottom:7px solid transparent;"></div>
+    <div style="position:absolute;left:0;top:-3px;width:0;height:0;
+    border-right:10px solid rgba(200,150,80,0.5);border-top:6px solid transparent;border-bottom:6px solid transparent;"></div>`;
+  arrowsLayer.appendChild(el);
+  arrow.el = el;
+  arrows.push(arrow);
+}
+
+// ─── Particles ───────────────────────────────────────────────────
+function spawnFeathers(x, y, color) {
+  for (let i = 0; i < 12; i++) {
+    const ang = Math.random()*Math.PI*2;
+    const spd = 2 + Math.random()*4;
+    const el = document.createElement('div');
+    const size = 6 + Math.random()*10;
+    el.style.cssText = `position:absolute;left:${x}px;top:${y}px;
+      width:${size}px;height:${size/3}px;background:${color};border-radius:50%;
+      opacity:1;pointer-events:none;transform:rotate(${ang}rad);`;
+    fxLayer.appendChild(el);
+    particles.push({ el, x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd-2, life: 1, gravity: 0.15 });
+  }
+  // Score star burst
+  for (let i = 0; i < 6; i++) {
+    const ang = (i/6)*Math.PI*2;
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;left:${x}px;top:${y}px;
+      width:4px;height:4px;background:#ffe066;border-radius:50%;
+      opacity:1;pointer-events:none;`;
+    fxLayer.appendChild(el);
+    particles.push({ el, x, y, vx: Math.cos(ang)*5, vy: Math.sin(ang)*5-1, life: 1, gravity: 0.05 });
+  }
+}
+
+// ─── Score Popup ─────────────────────────────────────────────────
+function showScorePop(x, y, txt, isMiss=false) {
+  const el = document.createElement('div');
+  el.className = isMiss ? 'miss-pop' : 'score-pop';
+  el.textContent = txt;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 950);
+}
+
+// ─── Aim Line ────────────────────────────────────────────────────
+function drawAim() {
+  aimCtx.clearRect(0, 0, 820, 520);
+  if (!charging || !gameRunning) return;
+  const dx = mouseX - ARCHER_X;
+  const dy = mouseY - ARCHER_Y;
+  const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+  const power = 0.4 + chargeLevel * 0.6;
+  const spd = 10 + power * 14;
+  const vx = (dx/dist)*spd;
+  const vy = (dy/dist)*spd;
+  const g = 0.18;
+
+  aimCtx.beginPath();
+  aimCtx.setLineDash([6, 8]);
+  aimCtx.strokeStyle = `rgba(255,220,80,${0.2+chargeLevel*0.5})`;
+  aimCtx.lineWidth = 2;
+  let px = ARCHER_X, py = ARCHER_Y, pvx = vx, pvy = vy;
+  aimCtx.moveTo(px, py);
+  for (let i = 0; i < 40; i++) {
+    px += pvx; py += pvy; pvy += g;
+    aimCtx.lineTo(px, py);
+    if (px < 0 || px > 820 || py > 520) break;
+  }
+  aimCtx.stroke();
+  aimCtx.setLineDash([]);
+}
+
+// ─── Main Loop ───────────────────────────────────────────────────
+let lastSpawn = 0;
+function loop(ts) {
+  if (!gameRunning) return;
+  animId = requestAnimationFrame(loop);
+
+  // Spawn birds
+  const spawnInterval = Math.max(400, 1200 - (level-1)*150);
+  if (birdsToSpawn > 0 && ts - lastSpawn > spawnInterval) {
+    spawnBird(); lastSpawn = ts;
+  }
+
+  // Charge meter tick
+  if (charging) {
+    chargeLevel = Math.min(1, (Date.now() - chargeStart) / 1000);
+    document.getElementById('chargeFill').style.width = (chargeLevel*100) + '%';
+    if (Math.random() < 0.15) playCharge(chargeLevel * 100);
+  }
+
+  drawAim();
+
+  // Update birds
+  birds.forEach(b => {
+    if (!b.alive) return;
+    b.t++;
+    b.x += b.speedX;
+    b.y += Math.sin(b.t * b.wobbleFreq + b.wobbleOffset) * 0.8;
+    b.el.style.left = b.x + 'px';
+    b.el.style.top  = b.y + 'px';
+    // Remove if off screen
+    if (b.x > 900 || b.x < -120) { b.alive = false; b.el.remove(); updateBirdCount(); }
+  });
+
+  // Update arrows
+  arrows.forEach(a => {
+    if (!a.alive) return;
+    a.x += a.vx; a.y += a.vy; a.vy += a.gravity;
+    const ang = Math.atan2(a.vy, a.vx);
+    a.el.style.left = a.x + 'px';
+    a.el.style.top  = a.y + 'px';
+    a.el.style.transform = `rotate(${ang}rad)`;
+
+    // Check bird collision
+    let hit = false;
+    birds.forEach(b => {
+      if (!b.alive) return;
+      const bx = b.x + b.bt.size*0.9;
+      const by = b.y + b.bt.size*0.65;
+      const dx = a.x - bx, dy = a.y - by;
+      if (Math.sqrt(dx*dx + dy*dy) < b.bt.size * 0.8) {
+        // HIT!
+        hit = true;
+        b.alive = false;
+        b.el.style.transition = 'transform 0.4s, opacity 0.4s, top 0.4s';
+        b.el.style.transform = b.fromRight ? 'scaleX(-1) rotate(90deg)' : 'rotate(90deg)';
+        b.el.style.opacity = '0';
+        setTimeout(() => { b.el.remove(); }, 450);
+        playHit();
+        const pts = b.bt.pts * level;
+        score += pts;
+        document.getElementById('scoreDisplay').textContent = score;
+        spawnFeathers(bx, by, b.bt.color);
+        showScorePop(bx - 20, by - 20, `+${pts}!`);
+        updateBirdCount();
+      }
+    });
+
+    if (hit || a.x < -20 || a.x > 860 || a.y > 520 || a.y < -20) {
+      if (!hit) {
+        playMiss();
+        showScorePop(a.x, a.y, 'MISS!', true);
+      }
+      a.alive = false; a.el.remove();
+    }
+  });
+  arrows = arrows.filter(a => a.alive);
+
+  // Update particles
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += p.gravity;
+    p.life -= 0.04;
+    p.el.style.left = p.x + 'px';
+    p.el.style.top  = p.y + 'px';
+    p.el.style.opacity = Math.max(0, p.life);
+    if (p.life <= 0) p.el.remove();
+  });
+  particles = particles.filter(p => p.life > 0);
+
+  // Check game over
+  const aliveBirds = birds.filter(b => b.alive).length;
+  if (arrowsLeft === 0 && arrows.length === 0) {
+    setTimeout(endRound, 600);
+    gameRunning = false;
+  }
+}
+
+function updateBirdCount() {
+  const rem = birdsToSpawn + birds.filter(b=>b.alive).length;
+  document.getElementById('birdsLeft').textContent = rem;
+}
+
+function endRound() {
+  cancelAnimationFrame(animId);
+  document.getElementById('finalScore').textContent = score;
+  const hits = 10 - arrowsLeft;
+  const birdsDowned = birds.filter(b=>!b.alive).length;
+  document.getElementById('resultMsg').textContent =
+    `You downed ${birdsDowned} birds with ${hits} arrows fired! Level ${level} complete.`;
+  document.getElementById('gameOverScreen').style.display = 'flex';
+}
+
+// ─── Start / Restart ─────────────────────────────────────────────
+function startGame() {
+  if (AC.state === 'suspended') AC.resume();
+  score = 0; arrowsLeft = 10; birdsToSpawn = 10; level = 1;
+  birds.forEach(b => b.el && b.el.remove());
+  arrows.forEach(a => a.el && a.el.remove());
+  particles.forEach(p => p.el && p.el.remove());
+  birds = []; arrows = []; particles = [];
+  lastSpawn = 0; chargeLevel = 0; charging = false;
+
+  document.getElementById('scoreDisplay').textContent = '0';
+  document.getElementById('levelDisplay').textContent = '1';
+  document.getElementById('birdsLeft').textContent = '10';
+  document.getElementById('chargeFill').style.width = '0%';
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('gameOverScreen').style.display = 'none';
+
+  updateArrowBar();
+  initClouds();
+  gameRunning = true;
+  requestAnimationFrame(loop);
+}
+
+// ─── Input ───────────────────────────────────────────────────────
+container.addEventListener('mousemove', e => {
+  const r = container.getBoundingClientRect();
+  mouseX = e.clientX - r.left;
+  mouseY = e.clientY - r.top;
+});
+container.addEventListener('mousedown', e => {
+  if (!gameRunning || arrowsLeft <= 0) return;
+  charging = true; chargeStart = Date.now(); chargeLevel = 0;
+});
+container.addEventListener('mouseup', e => {
+  if (!charging) return;
+  charging = false;
+  document.getElementById('chargeFill').style.width = '0%';
+  fireArrow();
+  chargeLevel = 0;
+});
+container.addEventListener('mouseleave', e => {
+  charging = false; chargeLevel = 0;
+  document.getElementById('chargeFill').style.width = '0%';
+});
+
+// Touch support
+container.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const r = container.getBoundingClientRect();
+  mouseX = e.touches[0].clientX - r.left;
+  mouseY = e.touches[0].clientY - r.top;
+}, { passive: false });
+container.addEventListener('touchstart', e => {
+  if (!gameRunning) return;
+  const r = container.getBoundingClientRect();
+  mouseX = e.touches[0].clientX - r.left;
+  mouseY = e.touches[0].clientY - r.top;
+  charging = true; chargeStart = Date.now(); chargeLevel = 0;
+});
+container.addEventListener('touchend', e => {
+  if (!charging) return;
+  charging = false;
+  document.getElementById('chargeFill').style.width = '0%';
+  fireArrow(); chargeLevel = 0;
+});
+</script>
+</body>
+</html>
